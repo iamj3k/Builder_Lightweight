@@ -61,6 +61,17 @@ User-level acceptance check (**friend can run this without installing dependenci
 
 ## Static blueprint quantity profile
 
+## EVE Cookbook blueprint hydration (optional)
+
+You can now source blueprint material lists directly from an EVE Cookbook-compatible API.
+
+- Set `evecookbook.enabled` to `true` in `app_config.json`.
+- Configure `evecookbook.base_url` and `evecookbook.blueprint_endpoint`.
+- Use `evecookbook.blueprints` to control which blueprint names are requested.
+- Material prices from the API (`adjusted_price` by default) are used as fallback `price_overrides` when local overrides are missing.
+
+When disabled, the launcher uses local `blueprints` and `price_overrides` exactly as before.
+
 The calculator now includes a static build plan sourced from your provided blueprint list in `src/build_plan.py`:
 
 - All listed blueprints are treated as fixed **ME 10 / TE 20** profiles.

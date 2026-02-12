@@ -11,6 +11,7 @@ from typing import Any
 
 from .cache import LocalSQLiteCache
 from .build_plan import STATIC_BUILD_QUANTITIES
+from .evecookbook import EveCookbookClient
 from .configuration import (
     MARKET_HUB_LOCATION_IDS,
     OUTPUT_MARKET_HUBS,
@@ -102,10 +103,10 @@ class CalculatorEngine:
         tax_rate = calculation_profile.facility_tax_percent + calculation_profile.scc_surcharge_percent
         default_me = int(calculation_profile.base_me)
         default_te = int(calculation_profile.base_te)
-        prices = self.config.get("price_overrides", {})
+        blueprints, prices = self._resolve_blueprints_and_prices()
 
         refreshed: list[BlueprintCost] = []
-        for bp in self.config["blueprints"]:
+        for bp in blueprints:
             ensure_blueprint_whitelisted(bp)
             cache_key = self._blueprint_config_hash(bp=bp, defaults=defaults, prices=prices)
             cached = self.cache.get_build_cost(cache_key)
@@ -141,6 +142,28 @@ class CalculatorEngine:
         self.results = refreshed
         self.last_refresh = datetime.now(timezone.utc)
         return refreshed
+
+
+    def _resolve_blueprints_and_prices(self) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Load blueprint/material config, optionally hydrating from EVE Cookbook API."""
+        blueprints = list(self.config.get("blueprints", []))
+        prices = dict(self.config.get("price_overrides", {}))
+
+        cookbook_cfg = self.config.get("evecookbook", {})
+        if not cookbook_cfg.get("enabled", False):
+            return blueprints, prices
+
+        client = EveCookbookClient(cookbook_cfg)
+        selected_blueprints = cookbook_cfg.get("blueprints") or sorted(STATIC_BUILD_QUANTITIES)
+
+        hydrated_blueprints: list[dict[str, Any]] = []
+        for blueprint_name in selected_blueprints:
+            blueprint = client.fetch_blueprint(str(blueprint_name))
+            hydrated_blueprints.append({"name": blueprint.name, "materials": blueprint.materials})
+            for material, price in blueprint.material_prices.items():
+                prices.setdefault(material, price)
+
+        return hydrated_blueprints, prices
 
     def attach_character_state(self, oauth_token: str, asset_rows: list[dict[str, Any]], order_rows: list[dict[str, Any]]) -> None:
         """Attach ESI-backed character state used for quantity and hub stock/on_market columns."""
