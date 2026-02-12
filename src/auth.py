@@ -32,14 +32,17 @@ class TokenSnapshot:
 
 class _CallbackHandler(BaseHTTPRequestHandler):
     auth_code: str | None = None
+    auth_state: str | None = None
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         query = urllib.parse.parse_qs(parsed.query)
         code = query.get("code", [None])[0]
+        state = query.get("state", [None])[0]
 
         if code:
             _CallbackHandler.auth_code = code
+            _CallbackHandler.auth_state = state
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"Login successful. You can close this window.")
@@ -66,10 +69,12 @@ class EveSsoClient:
     def login(self) -> AuthResult:
         verifier = self._code_verifier()
         challenge = self._code_challenge(verifier)
+        state = secrets.token_urlsafe(24)
 
         parsed = urllib.parse.urlparse(self.redirect_uri)
         server = HTTPServer((parsed.hostname or "127.0.0.1", parsed.port or 8799), _CallbackHandler)
         _CallbackHandler.auth_code = None
+        _CallbackHandler.auth_state = None
 
         thread = threading.Thread(target=server.handle_request, daemon=True)
         thread.start()
@@ -79,6 +84,7 @@ class EveSsoClient:
             "redirect_uri": self.redirect_uri,
             "client_id": self.client_id,
             "scope": " ".join(self.scopes),
+            "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
@@ -91,6 +97,8 @@ class EveSsoClient:
         code = _CallbackHandler.auth_code
         if not code:
             raise RuntimeError("EVE SSO login timed out or was cancelled")
+        if _CallbackHandler.auth_state != state:
+            raise RuntimeError("EVE SSO login failed state validation")
 
         auth = self._token_request(
             {
