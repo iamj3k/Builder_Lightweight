@@ -158,12 +158,18 @@ class CalculatorEngine:
 
         hydrated_blueprints: list[dict[str, Any]] = []
         for blueprint_name in selected_blueprints:
-            blueprint = client.fetch_blueprint(str(blueprint_name))
+            try:
+                blueprint = client.fetch_blueprint(str(blueprint_name))
+            except Exception:
+                continue
             hydrated_blueprints.append({"name": blueprint.name, "materials": blueprint.materials})
             for material, price in blueprint.material_prices.items():
                 prices.setdefault(material, price)
 
-        return hydrated_blueprints, prices
+        if hydrated_blueprints:
+            return hydrated_blueprints, prices
+
+        return blueprints, prices
 
     def attach_character_state(self, oauth_token: str, asset_rows: list[dict[str, Any]], order_rows: list[dict[str, Any]]) -> None:
         """Attach ESI-backed character state used for quantity and hub stock/on_market columns."""

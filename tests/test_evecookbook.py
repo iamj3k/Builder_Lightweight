@@ -89,3 +89,35 @@ def test_engine_can_hydrate_blueprints_from_evecookbook(tmp_path: Path, monkeypa
     assert len(result) == 1
     assert result[0].name == "Rifter"
     assert result[0].total_cost > 0
+
+
+def test_engine_falls_back_to_local_blueprints_when_cookbook_hydration_fails(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "defaults": {"me": 10, "te": 20, "tax_rate": 0.08},
+                "evecookbook": {
+                    "enabled": True,
+                    "base_url": "https://example.test",
+                    "blueprint_endpoint": "/api/blueprints/{blueprint_name}",
+                    "blueprints": ["Rifter"],
+                },
+                "price_overrides": {"Tritanium": 2.0},
+                "blueprints": [{"name": "Rifter", "materials": {"Tritanium": 10}}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def failing_urlopen(url: str, timeout: float):
+        raise RuntimeError("cookbook unavailable")
+
+    monkeypatch.setattr("src.evecookbook.urlopen", failing_urlopen)
+
+    engine = CalculatorEngine(config_path)
+    result = engine.refresh_data()
+
+    assert len(result) == 1
+    assert result[0].name == "Rifter"
+    assert result[0].total_cost > 0
