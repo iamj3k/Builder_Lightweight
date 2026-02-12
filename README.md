@@ -70,6 +70,23 @@ The calculator now includes a static build plan sourced from your provided bluep
 
 ## Run locally
 
+If you're starting from GitHub, you do need to clone/download this repository first.
+
+### Quick start (from GitHub)
+
+```bash
+git clone https://github.com/<your-org-or-user>/Builder_Lightweight.git
+cd Builder_Lightweight
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m src.launcher
+```
+
+If you don't want to install Python locally, use the prebuilt Windows release ZIP after running the packaging script in this repo.
+
+### Run locally (already downloaded)
+
 ```bash
 python -m src.launcher
 ```
