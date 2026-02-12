@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .cache import LocalSQLiteCache
-from .configuration import ensure_blueprint_whitelisted, get_me_te_for_blueprint
+from .configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS, ensure_blueprint_whitelisted, get_me_te_for_blueprint
+from .providers import EsiCharacterStateAdapter
 
 
 CSV_EXPORT_HEADERS = [
@@ -54,6 +55,22 @@ class BlueprintCost:
     total_cost: float
 
 
+@dataclass
+class MarketHubMetrics:
+    sell_price: float = 0.0
+    on_market: int = 0
+    stock: int = 0
+    order_price: float = 0.0
+    avg_daily_volume: float = 0.0
+
+
+class LivePriceProvider:
+    """Protocol-like base class for optional live pricing integrations."""
+
+    def get_sell_price(self, item_name: str) -> float | None:
+        return None
+
+
 class CalculatorEngine:
     """Small calculator engine used by the desktop launcher."""
 
@@ -62,6 +79,7 @@ class CalculatorEngine:
         self.config: dict[str, Any] = {}
         self.last_refresh: datetime | None = None
         self.results: list[BlueprintCost] = []
+        self._character_adapter: EsiCharacterStateAdapter | None = None
         self.cache = LocalSQLiteCache(config_path.with_suffix(".cache.sqlite3"))
         self.load_config()
 
@@ -107,6 +125,14 @@ class CalculatorEngine:
         self.last_refresh = datetime.now(timezone.utc)
         return refreshed
 
+    def attach_character_state(self, oauth_token: str, asset_rows: list[dict[str, Any]], order_rows: list[dict[str, Any]]) -> None:
+        """Attach ESI-backed character state used for quantity and hub stock/on_market columns."""
+        self._character_adapter = EsiCharacterStateAdapter(
+            oauth_token=oauth_token,
+            asset_rows=asset_rows,
+            order_rows=order_rows,
+        )
+
     @staticmethod
     def _blueprint_config_hash(bp: dict[str, Any], defaults: dict[str, Any], prices: dict[str, Any]) -> str:
         relevant_prices = {name: prices.get(name, 0) for name in sorted(bp["materials"])}
@@ -122,46 +148,101 @@ class CalculatorEngine:
         digest_input = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
 
-    def export_csv(self, target_path: Path) -> Path:
+    def export_csv(self, target_path: Path, *, live_price_provider: LivePriceProvider | None = None) -> Path:
         if not self.results:
             self.refresh_data()
+
+        market_overrides: dict[str, dict[str, Any]] = self.config.get("hub_market_overrides", {})
+        hub_state_records = (
+            self._character_adapter.get_hub_state_records(MARKET_HUB_LOCATION_IDS)
+            if self._character_adapter
+            else {}
+        )
+        character_totals = self._character_adapter.get_character_state_records() if self._character_adapter else {}
 
         with target_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(CSV_EXPORT_HEADERS)
             for row in self.results:
+                normalized_name = row.name.strip().lower()
+                quantity = 0
+                for state_key, state in character_totals.items():
+                    if state_key.item_name == normalized_name:
+                        quantity += state.asset_quantity
+
+                hub_metrics = self._resolve_hub_metrics(
+                    item_name=row.name,
+                    market_overrides=market_overrides,
+                    hub_state_records=hub_state_records,
+                    live_price_provider=live_price_provider,
+                )
+
                 writer.writerow(
                     [
                         row.name,
                         row.total_cost,
                         "",
                         "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
-                        "",
+                        quantity,
+                        hub_metrics["Jita"].sell_price,
+                        hub_metrics["Jita"].on_market,
+                        hub_metrics["Jita"].stock,
+                        hub_metrics["Jita"].order_price,
+                        hub_metrics["Jita"].avg_daily_volume,
+                        hub_metrics["Amarr"].sell_price,
+                        hub_metrics["Amarr"].on_market,
+                        hub_metrics["Amarr"].stock,
+                        hub_metrics["Amarr"].order_price,
+                        hub_metrics["Amarr"].avg_daily_volume,
+                        hub_metrics["Dodixie"].sell_price,
+                        hub_metrics["Dodixie"].on_market,
+                        hub_metrics["Dodixie"].stock,
+                        hub_metrics["Dodixie"].order_price,
+                        hub_metrics["Dodixie"].avg_daily_volume,
+                        hub_metrics["O-PNSN"].sell_price,
+                        hub_metrics["O-PNSN"].on_market,
+                        hub_metrics["O-PNSN"].stock,
+                        hub_metrics["O-PNSN"].order_price,
+                        hub_metrics["O-PNSN"].avg_daily_volume,
+                        hub_metrics["C-N4OD"].sell_price,
+                        hub_metrics["C-N4OD"].on_market,
+                        hub_metrics["C-N4OD"].stock,
+                        hub_metrics["C-N4OD"].order_price,
+                        hub_metrics["C-N4OD"].avg_daily_volume,
                     ]
                 )
         return target_path
+
+    def _resolve_hub_metrics(
+        self,
+        *,
+        item_name: str,
+        market_overrides: dict[str, dict[str, Any]],
+        hub_state_records: dict[tuple[Any, str], Any],
+        live_price_provider: LivePriceProvider | None,
+    ) -> dict[str, MarketHubMetrics]:
+        result = {hub_name: MarketHubMetrics() for hub_name in OUTPUT_MARKET_HUBS}
+        lookup_name = item_name.strip().lower()
+
+        for hub_name in OUTPUT_MARKET_HUBS:
+            hub_rows = market_overrides.get(hub_name, {})
+            for configured_name, row in hub_rows.items():
+                if str(configured_name).strip().lower() != lookup_name:
+                    continue
+                result[hub_name].sell_price = float(row.get("sell_price", 0.0))
+                result[hub_name].order_price = float(row.get("order_price", 0.0))
+                result[hub_name].avg_daily_volume = float(row.get("avg_daily_volume", 0.0))
+
+        if live_price_provider is not None:
+            live_sell = live_price_provider.get_sell_price(item_name)
+            if live_sell is not None:
+                result["Jita"].sell_price = float(live_sell)
+
+        for (key, hub_name), values in hub_state_records.items():
+            if hub_name not in result:
+                continue
+            if key.item_name == lookup_name:
+                result[hub_name].stock = int(values.stock)
+                result[hub_name].on_market = int(values.on_market)
+
+        return result

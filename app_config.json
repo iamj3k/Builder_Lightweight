@@ -40,5 +40,117 @@
     "Tritanium": 4.0,
     "Pyerite": 8.5,
     "Mexallon": 58.0
+  },
+  "hub_market_overrides": {
+    "Jita": {
+      "Rifter": {
+        "sell_price": 550000.0,
+        "order_price": 530000.0,
+        "avg_daily_volume": 120.0
+      },
+      "Merlin": {
+        "sell_price": 610000.0,
+        "order_price": 590000.0,
+        "avg_daily_volume": 95.0
+      }
+    },
+    "Amarr": {
+      "Rifter": {
+        "sell_price": 565000.0,
+        "order_price": 540000.0,
+        "avg_daily_volume": 75.0
+      },
+      "Merlin": {
+        "sell_price": 625000.0,
+        "order_price": 600000.0,
+        "avg_daily_volume": 55.0
+      }
+    },
+    "Dodixie": {
+      "Rifter": {
+        "sell_price": 560000.0,
+        "order_price": 538000.0,
+        "avg_daily_volume": 66.0
+      },
+      "Merlin": {
+        "sell_price": 620000.0,
+        "order_price": 598000.0,
+        "avg_daily_volume": 48.0
+      }
+    },
+    "O-PNSN": {
+      "Rifter": {
+        "sell_price": 590000.0,
+        "order_price": 565000.0,
+        "avg_daily_volume": 22.0
+      },
+      "Merlin": {
+        "sell_price": 650000.0,
+        "order_price": 620000.0,
+        "avg_daily_volume": 16.0
+      }
+    },
+    "C-N4OD": {
+      "Rifter": {
+        "sell_price": 600000.0,
+        "order_price": 575000.0,
+        "avg_daily_volume": 18.0
+      },
+      "Merlin": {
+        "sell_price": 660000.0,
+        "order_price": 635000.0,
+        "avg_daily_volume": 12.0
+      }
+    }
+  },
+  "character_state_overrides": {
+    "assets": [
+      {
+        "item_name": "Rifter",
+        "type_id": 587,
+        "location_id": 60003760,
+        "quantity": 4
+      },
+      {
+        "item_name": "Rifter",
+        "type_id": 587,
+        "location_id": 1022734985679,
+        "quantity": 2
+      },
+      {
+        "item_name": "Merlin",
+        "type_id": 603,
+        "location_id": 60008494,
+        "quantity": 3
+      }
+    ],
+    "open_orders": [
+      {
+        "item_name": "Rifter",
+        "type_id": 587,
+        "location_id": 60003760,
+        "volume_remain": 1
+      },
+      {
+        "item_name": "Rifter",
+        "type_id": 587,
+        "location_id": 1022734985679,
+        "volume_remain": 2
+      },
+      {
+        "item_name": "Merlin",
+        "type_id": 603,
+        "location_id": 60008494,
+        "volume_remain": 1
+      }
+    ]
+  },
+  "live_jita_prices": {
+    "Rifter": {
+      "sell_price": 555000.0
+    },
+    "Merlin": {
+      "sell_price": 615000.0
+    }
   }
 }

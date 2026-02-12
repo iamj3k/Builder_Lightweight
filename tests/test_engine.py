@@ -1,3 +1,4 @@
+import csv
 import sys
 from pathlib import Path
 
@@ -6,7 +7,15 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS
-from src.engine import CSV_EXPORT_HEADERS, CalculatorEngine
+from src.engine import CSV_EXPORT_HEADERS, CalculatorEngine, LivePriceProvider
+
+
+class StubLivePriceProvider(LivePriceProvider):
+    def __init__(self, sell_prices: dict[str, float]) -> None:
+        self._prices = sell_prices
+
+    def get_sell_price(self, item_name: str) -> float | None:
+        return self._prices.get(item_name)
 
 
 def test_refresh_data_and_export_csv(tmp_path: Path) -> None:
@@ -91,3 +100,48 @@ def test_market_hub_location_ids_are_explicit_and_stable() -> None:
         "O-PNSN": [1036927076065],
         "C-N4OD": [1037131880317],
     }
+
+
+def test_export_uses_character_state_and_multi_hub_market_data(tmp_path: Path) -> None:
+    engine = CalculatorEngine(Path("app_config.json"))
+    engine.refresh_data()
+    engine.attach_character_state(
+        oauth_token="token",
+        asset_rows=[
+            {"item_name": "Rifter", "type_id": 587, "location_id": 60003760, "quantity": 4},
+            {"item_name": "Rifter", "type_id": 587, "location_id": 1022734985679, "quantity": 2},
+            {"item_name": "Merlin", "type_id": 603, "location_id": 60008494, "quantity": 3},
+        ],
+        order_rows=[
+            {"item_name": "Rifter", "type_id": 587, "location_id": 60003760, "volume_remain": 1},
+            {"item_name": "Rifter", "type_id": 587, "location_id": 1022734985679, "volume_remain": 2},
+            {"item_name": "Merlin", "type_id": 603, "location_id": 60008494, "volume_remain": 1},
+        ],
+    )
+
+    out_csv = tmp_path / "full_output.csv"
+    engine.export_csv(out_csv)
+
+    with out_csv.open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    rifter = next(row for row in rows if row["item_name"] == "Rifter")
+    assert rifter["quantity"] == "6"
+    assert rifter["jita_stock"] == "6"
+    assert rifter["jita_on_market"] == "3"
+    assert rifter["jita_sell_price"] == "550000.0"
+    assert rifter["amarr_sell_price"] == "565000.0"
+
+
+def test_export_prefers_live_jita_price_provider(tmp_path: Path) -> None:
+    engine = CalculatorEngine(Path("app_config.json"))
+    engine.refresh_data()
+
+    out_csv = tmp_path / "jita_live.csv"
+    engine.export_csv(out_csv, live_price_provider=StubLivePriceProvider({"Rifter": 777777.0}))
+
+    with out_csv.open("r", encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    rifter = next(row for row in rows if row["item_name"] == "Rifter")
+    assert rifter["jita_sell_price"] == "777777.0"

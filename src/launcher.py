@@ -5,8 +5,9 @@ from pathlib import Path
 from tkinter import Button, Label, StringVar, Tk
 from tkinter import filedialog, messagebox
 
-from auth import EveSsoClient
-from engine import CalculatorEngine
+from .auth import EveSsoClient
+from .engine import CalculatorEngine
+from .live_pricing import ConfigJitaLivePriceProvider
 
 
 def bundled_path(file_name: str) -> Path:
@@ -23,6 +24,8 @@ class LauncherApp:
         self.connection_state = StringVar(value="Reconnect")
 
         self.engine = CalculatorEngine(bundled_path("app_config.json"))
+        self.live_pricing = ConfigJitaLivePriceProvider(self.engine.config)
+
         esi_cfg = self.engine.config["esi"]
         self.sso = EveSsoClient(
             client_id=esi_cfg["client_id"],
@@ -40,6 +43,14 @@ class LauncherApp:
 
         Label(root, textvariable=self.status).pack(pady=(10, 12))
 
+    def _attach_character_state_from_config(self, access_token: str) -> None:
+        overrides = self.engine.config.get("character_state_overrides", {})
+        self.engine.attach_character_state(
+            oauth_token=access_token,
+            asset_rows=list(overrides.get("assets", [])),
+            order_rows=list(overrides.get("open_orders", [])),
+        )
+
     def login(self) -> None:
         if self.engine.config["esi"]["client_id"].startswith("REPLACE_WITH"):
             messagebox.showwarning(
@@ -50,7 +61,8 @@ class LauncherApp:
         self.status.set("Logging in via EVE SSO...")
         self.root.update_idletasks()
         try:
-            self.sso.login()
+            auth = self.sso.login()
+            self._attach_character_state_from_config(auth.access_token)
             self.connection_state.set("Connected")
             self.status.set("Connected")
         except Exception:
@@ -60,7 +72,8 @@ class LauncherApp:
 
     def refresh_data(self) -> None:
         try:
-            self.sso.ensure_access_token()
+            access_token = self.sso.ensure_access_token()
+            self._attach_character_state_from_config(access_token)
             self.connection_state.set("Connected")
         except Exception:
             self.connection_state.set("Reconnect")
@@ -79,7 +92,7 @@ class LauncherApp:
         )
         if not target:
             return
-        path = self.engine.export_csv(Path(target))
+        path = self.engine.export_csv(Path(target), live_price_provider=self.live_pricing)
         self.status.set(f"Exported CSV to {path}")
         messagebox.showinfo("Export complete", f"Saved to:\n{path}")
 
