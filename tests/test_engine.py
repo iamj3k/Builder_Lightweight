@@ -148,6 +148,44 @@ def test_export_prefers_live_jita_price_provider(tmp_path: Path) -> None:
     assert rifter["jita_sell_price"] == "777777.0"
 
 
+
+
+def test_build_calculation_profile_from_config_is_used_for_costing(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        """
+        {
+          "defaults": {
+            "me": 0,
+            "te": 0,
+            "tax_rate": 0.0,
+            "build_calculation": {
+              "base_me": 10,
+              "base_te": 10,
+              "system": "O-PNSN",
+              "facility_tax_percent": 0.0,
+              "scc_surcharge_percent": 0.04,
+              "additional_cost_isk": 10.0,
+              "manufacturing_structure": "Sotiyo",
+              "manufacturing_rig": "T2 industry rig"
+            }
+          },
+          "blueprints": [
+            {"name": "Rifter", "materials": {"Tritanium": 100}}
+          ],
+          "price_overrides": {"Tritanium": 1.0}
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    engine = CalculatorEngine(config_path)
+    result = engine.refresh_data()[0]
+
+    assert result.material_cost == 87.0
+    assert result.tax_cost == 8.7
+    assert result.total_cost == 105.7
+
 def test_static_build_quantities_include_user_blueprints_and_merge_duplicates() -> None:
     assert STATIC_BUILD_QUANTITIES["10MN Afterburner II"] == 1296
     assert STATIC_BUILD_QUANTITIES["Bustard"] == 50
