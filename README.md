@@ -1,12 +1,62 @@
 # Builder Lightweight Desktop Launcher
 
-This repository now includes a desktop launcher that embeds a local calculator engine and exposes:
+This repository includes a desktop launcher that embeds a local calculator engine and exposes:
 
 - **Connected / Reconnect** button
 - **Refresh data** button
 - **Export CSV** button
 
 The launcher reads a **fixed app config file** (`app_config.json`) that is bundled into the executable.
+
+## Milestone delivery map
+
+### Milestone 1 — CSV schema lock + baseline exporter
+
+Delivered:
+- Fixed CSV header schema is hard-locked in `CSV_EXPORT_HEADERS`.
+- Baseline CSV exporter writes all required columns in stable order.
+- Regression tests validate exact schema and exporter behavior.
+
+User-level acceptance check (**friend can run this without installing dependencies**):
+1. Copy a built `BuilderLightweightLauncher.exe` to a Windows machine with no Python.
+2. Run the EXE and click **Export CSV**.
+3. Open the CSV and verify the first row matches the expected locked schema.
+
+### Milestone 2 — live pricing for one hub
+
+Delivered:
+- Added live-price provider interface (`LivePriceProvider`).
+- Added Jita live-price adapter from config (`ConfigJitaLivePriceProvider`).
+- Export path now prefers live Jita sell price when available.
+
+User-level acceptance check (**friend can run this without installing dependencies**):
+1. Copy only the packaged release ZIP contents to a clean Windows machine.
+2. Run `BuilderLightweightLauncher.exe` and click **Export CSV**.
+3. Confirm `jita_sell_price` reflects configured live Jita values.
+
+### Milestone 3 — character auth and inventory/order integration
+
+Delivered:
+- OAuth sign-in + reconnect flow is integrated with refresh.
+- Character asset/open-order rows are attached after token refresh/login.
+- Export now fills `quantity`, `*_stock`, and `*_on_market` from character state.
+
+User-level acceptance check (**friend can run this without installing dependencies**):
+1. On a clean Windows machine, run the EXE and click **Reconnect**.
+2. Complete browser login.
+3. Click **Refresh data** then **Export CSV** and verify quantity / stock / on_market columns populate.
+
+### Milestone 4 — full multi-hub output and Windows executable packaging
+
+Delivered:
+- Multi-hub output is populated for Jita / Amarr / Dodixie / O-PNSN / C-N4OD.
+- Added release packaging script to bundle EXE + config + README into a ZIP.
+- Existing PyInstaller and Nuitka builds remain supported.
+
+User-level acceptance check (**friend can run this without installing dependencies**):
+1. Build and package with the provided scripts.
+2. Send `release/BuilderLightweight-windows.zip` to a friend.
+3. Friend extracts and runs `BuilderLightweightLauncher.exe` directly (no Python install).
 
 ## Run locally
 
@@ -22,7 +72,6 @@ scripts\build_pyinstaller_windows.bat
 ```
 
 Expected output:
-
 - `dist\BuilderLightweightLauncher.exe`
 
 ## Build Windows executable (Nuitka)
@@ -33,19 +82,16 @@ scripts\build_nuitka_windows.bat
 ```
 
 Expected output:
-
 - `BuilderLightweightLauncher.exe`
 
-## Clean VM verification checklist
+## Package release ZIP (Windows)
 
-1. Start a clean Windows VM with no Python installed.
-2. Copy only `BuilderLightweightLauncher.exe` to the VM.
-3. Launch executable.
-4. Confirm UI opens with **Connected/Reconnect**, **Refresh data**, and **Export CSV**.
-5. Click **Refresh data** and verify status updates with totals.
-6. Click **Export CSV** and verify a CSV file is saved.
-7. Configure `esi.client_id` in bundled config before full EVE SSO login verification.
+```powershell
+scripts\package_windows_release.bat
+```
 
+Expected output:
+- `release\BuilderLightweight-windows.zip`
 
 ## ESI hub mapping rules (`*_on_market`, `*_stock`)
 
@@ -64,17 +110,3 @@ Configured hub -> location IDs:
 - **C-N4OD**: `1037131880317`
 
 These mappings are defined in `src/configuration.py::MARKET_HUB_LOCATION_IDS` and consumed by `EsiCharacterStateAdapter.get_hub_state_records(...)`.
-
-
-## OAuth behavior
-
-- The app opens the system browser for EVE SSO login using OAuth2 PKCE.
-- The callback is captured from the configured localhost redirect URI.
-- Refresh tokens are encrypted with Windows DPAPI before being stored on disk.
-- The launcher auto-refreshes access tokens before data refreshes.
-- The UI intentionally only exposes **Connected** or **Reconnect** and hides token/expiry details.
-
-## Notes
-
-- `app_config.json` carries default blueprints, ME/TE, structure/system assumptions, tax, and target locations.
-- You can edit those defaults before building to ship a different fixed bundle.
