@@ -7,6 +7,7 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS
+from src.build_plan import STATIC_BUILD_QUANTITIES
 from src.engine import CSV_EXPORT_HEADERS, CalculatorEngine, LivePriceProvider
 
 
@@ -126,7 +127,7 @@ def test_export_uses_character_state_and_multi_hub_market_data(tmp_path: Path) -
         rows = list(csv.DictReader(f))
 
     rifter = next(row for row in rows if row["item_name"] == "Rifter")
-    assert rifter["quantity"] == "6"
+    assert rifter["quantity"] == "0"
     assert rifter["jita_stock"] == "6"
     assert rifter["jita_on_market"] == "3"
     assert rifter["jita_sell_price"] == "550000.0"
@@ -145,3 +146,10 @@ def test_export_prefers_live_jita_price_provider(tmp_path: Path) -> None:
 
     rifter = next(row for row in rows if row["item_name"] == "Rifter")
     assert rifter["jita_sell_price"] == "777777.0"
+
+
+def test_static_build_quantities_include_user_blueprints_and_merge_duplicates() -> None:
+    assert STATIC_BUILD_QUANTITIES["10MN Afterburner II"] == 1296
+    assert STATIC_BUILD_QUANTITIES["Bustard"] == 50
+    assert STATIC_BUILD_QUANTITIES["Signal Amplifier II"] == 12965
+    assert STATIC_BUILD_QUANTITIES["Complex Asteroid Mining Crystal Type A II"] == 37926

@@ -58,6 +58,16 @@ User-level acceptance check (**friend can run this without installing dependenci
 2. Send `release/BuilderLightweight-windows.zip` to a friend.
 3. Friend extracts and runs `BuilderLightweightLauncher.exe` directly (no Python install).
 
+
+## Static blueprint quantity profile
+
+The calculator now includes a static build plan sourced from your provided blueprint list in `src/build_plan.py`:
+
+- All listed blueprints are treated as fixed **ME 10 / TE 20** profiles.
+- Duplicate blueprint rows are intentionally merged by summing quantities.
+- CSV `quantity` column now exports the configured build quantity from this static plan.
+- Build-cost computation is quantity-aware (batch-material rounding is applied before deriving per-unit cost), so larger runs benefit from ME exactly as requested.
+
 ## Run locally
 
 ```bash
