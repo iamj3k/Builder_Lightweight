@@ -1,0 +1,44 @@
+{
+  "esi": {
+    "client_id": "REPLACE_WITH_EVE_SSO_CLIENT_ID",
+    "redirect_uri": "http://127.0.0.1:8799/callback",
+    "scopes": [
+      "esi-markets.structure_markets.v1",
+      "esi-universe.read_structures.v1"
+    ]
+  },
+  "defaults": {
+    "me": 10,
+    "te": 20,
+    "structure": "Azbel",
+    "system": "Jita",
+    "tax_rate": 0.08,
+    "target_locations": [
+      "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
+      "Perimeter - Tranquility Trading Tower"
+    ]
+  },
+  "blueprints": [
+    {
+      "name": "Rifter",
+      "materials": {
+        "Tritanium": 53000,
+        "Pyerite": 11000,
+        "Mexallon": 3000
+      }
+    },
+    {
+      "name": "Merlin",
+      "materials": {
+        "Tritanium": 65000,
+        "Pyerite": 12500,
+        "Mexallon": 3500
+      }
+    }
+  ],
+  "price_overrides": {
+    "Tritanium": 4.0,
+    "Pyerite": 8.5,
+    "Mexallon": 58.0
+  }
+}
