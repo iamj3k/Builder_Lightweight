@@ -5,10 +5,12 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from math import ceil
 from pathlib import Path
 from typing import Any
 
 from .cache import LocalSQLiteCache
+from .build_plan import STATIC_BUILD_QUANTITIES
 from .configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS, ensure_blueprint_whitelisted, get_me_te_for_blueprint
 from .providers import EsiCharacterStateAdapter
 
@@ -104,17 +106,22 @@ class CalculatorEngine:
                 refreshed.append(BlueprintCost(**cached))
                 continue
 
-            bp_me, _ = get_me_te_for_blueprint(bp["name"], default_me=default_me, default_te=default_te)
+            bp_name = str(bp["name"])
+            build_quantity = int(STATIC_BUILD_QUANTITIES.get(bp_name, 1))
+            bp_me, _ = get_me_te_for_blueprint(bp_name, default_me=default_me, default_te=default_te)
             me_bonus = (100 - bp_me) / 100
-            material_cost = 0.0
+            total_material_cost = 0.0
             for material, amount in bp["materials"].items():
                 unit_price = float(prices.get(material, 0))
-                material_cost += amount * me_bonus * unit_price
-            tax_cost = material_cost * tax_rate
-            total_cost = material_cost + tax_cost
+                required_for_batch = ceil(float(amount) * build_quantity * me_bonus)
+                total_material_cost += required_for_batch * unit_price
+
+            material_cost_per_unit = total_material_cost / build_quantity
+            tax_cost = material_cost_per_unit * tax_rate
+            total_cost = material_cost_per_unit + tax_cost
             row = BlueprintCost(
-                name=bp["name"],
-                material_cost=round(material_cost, 2),
+                name=bp_name,
+                material_cost=round(material_cost_per_unit, 2),
                 tax_cost=round(tax_cost, 2),
                 total_cost=round(total_cost, 2),
             )
@@ -136,6 +143,7 @@ class CalculatorEngine:
     @staticmethod
     def _blueprint_config_hash(bp: dict[str, Any], defaults: dict[str, Any], prices: dict[str, Any]) -> str:
         relevant_prices = {name: prices.get(name, 0) for name in sorted(bp["materials"])}
+        build_quantity = int(STATIC_BUILD_QUANTITIES.get(str(bp.get("name", "")), 1))
         payload = {
             "blueprint": bp,
             "defaults": {
@@ -144,6 +152,7 @@ class CalculatorEngine:
                 "te": defaults["te"],
             },
             "prices": relevant_prices,
+            "build_quantity": build_quantity,
         }
         digest_input = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
@@ -158,17 +167,11 @@ class CalculatorEngine:
             if self._character_adapter
             else {}
         )
-        character_totals = self._character_adapter.get_character_state_records() if self._character_adapter else {}
-
         with target_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(CSV_EXPORT_HEADERS)
             for row in self.results:
-                normalized_name = row.name.strip().lower()
-                quantity = 0
-                for state_key, state in character_totals.items():
-                    if state_key.item_name == normalized_name:
-                        quantity += state.asset_quantity
+                quantity = int(STATIC_BUILD_QUANTITIES.get(row.name, 0))
 
                 hub_metrics = self._resolve_hub_metrics(
                     item_name=row.name,

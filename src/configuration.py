@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from .build_plan import STATIC_BUILD_QUANTITIES
+
 # Canonical blueprint whitelist for fast local validation.
-ALLOWED_BLUEPRINT_IDS: set[int] = {1001, 1002}
-ALLOWED_BLUEPRINT_NAMES: set[str] = {"Rifter", "Merlin"}
+ALLOWED_BLUEPRINT_IDS: set[int] = set()
+ALLOWED_BLUEPRINT_NAMES: set[str] = set(STATIC_BUILD_QUANTITIES) | {"Rifter", "Merlin"}
 
 # Per-blueprint efficiency assumptions.
 BLUEPRINT_ME_TE: dict[str, dict[str, int]] = {
-    "Rifter": {"me": 10, "te": 20},
-    "Merlin": {"me": 10, "te": 20},
+    bp_name: {"me": 10, "te": 20} for bp_name in ALLOWED_BLUEPRINT_NAMES
 }
 
 # Structure/rig bonuses used by local costing assumptions.
