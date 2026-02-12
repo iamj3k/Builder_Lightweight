@@ -16,7 +16,22 @@
     "target_locations": [
       "Jita IV - Moon 4 - Caldari Navy Assembly Plant",
       "Perimeter - Tranquility Trading Tower"
-    ]
+    ],
+    "build_calculation": {
+      "base_me": 10,
+      "base_te": 10,
+      "system": "O-PNSN",
+      "facility_tax_percent": 0.0,
+      "scc_surcharge_percent": 0.04,
+      "additional_cost_isk": 0.0,
+      "runs_per_bpc": "max",
+      "calculate_reaction_jobs": true,
+      "show_detailed_build_steps": true,
+      "manufacturing_structure": "Sotiyo",
+      "manufacturing_rig": "T2 industry rig",
+      "reaction_structure": "Tatara",
+      "reaction_rig": "T2 reaction rig"
+    }
   },
   "blueprints": [
     {

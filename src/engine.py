@@ -11,7 +11,13 @@ from typing import Any
 
 from .cache import LocalSQLiteCache
 from .build_plan import STATIC_BUILD_QUANTITIES
-from .configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS, ensure_blueprint_whitelisted, get_me_te_for_blueprint
+from .configuration import (
+    MARKET_HUB_LOCATION_IDS,
+    OUTPUT_MARKET_HUBS,
+    ensure_blueprint_whitelisted,
+    get_me_te_for_blueprint,
+    load_build_calculation_profile,
+)
 from .providers import EsiCharacterStateAdapter
 
 
@@ -92,9 +98,10 @@ class CalculatorEngine:
     def refresh_data(self) -> list[BlueprintCost]:
         """Recalculate costs from the fixed bundled config."""
         defaults = self.config["defaults"]
-        tax_rate = float(defaults["tax_rate"])
-        default_me = int(defaults["me"])
-        default_te = int(defaults["te"])
+        calculation_profile = load_build_calculation_profile(defaults)
+        tax_rate = calculation_profile.facility_tax_percent + calculation_profile.scc_surcharge_percent
+        default_me = int(calculation_profile.base_me)
+        default_te = int(calculation_profile.base_te)
         prices = self.config.get("price_overrides", {})
 
         refreshed: list[BlueprintCost] = []
@@ -110,19 +117,22 @@ class CalculatorEngine:
             build_quantity = int(STATIC_BUILD_QUANTITIES.get(bp_name, 1))
             bp_me, _ = get_me_te_for_blueprint(bp_name, default_me=default_me, default_te=default_te)
             me_bonus = (100 - bp_me) / 100
+            facility_me_multiplier = max(0.0, 1.0 - calculation_profile.manufacturing_material_efficiency_bonus)
             total_material_cost = 0.0
             for material, amount in bp["materials"].items():
                 unit_price = float(prices.get(material, 0))
-                required_for_batch = ceil(float(amount) * build_quantity * me_bonus)
+                required_for_batch = ceil(float(amount) * build_quantity * me_bonus * facility_me_multiplier)
                 total_material_cost += required_for_batch * unit_price
 
             material_cost_per_unit = total_material_cost / build_quantity
+            system_cost = material_cost_per_unit * calculation_profile.system_cost_index
             tax_cost = material_cost_per_unit * tax_rate
-            total_cost = material_cost_per_unit + tax_cost
+            additional_cost_per_unit = calculation_profile.additional_cost_isk / max(build_quantity, 1)
+            total_cost = material_cost_per_unit + system_cost + tax_cost + additional_cost_per_unit
             row = BlueprintCost(
                 name=bp_name,
                 material_cost=round(material_cost_per_unit, 2),
-                tax_cost=round(tax_cost, 2),
+                tax_cost=round(tax_cost + system_cost, 2),
                 total_cost=round(total_cost, 2),
             )
             refreshed.append(row)
@@ -144,15 +154,25 @@ class CalculatorEngine:
     def _blueprint_config_hash(bp: dict[str, Any], defaults: dict[str, Any], prices: dict[str, Any]) -> str:
         relevant_prices = {name: prices.get(name, 0) for name in sorted(bp["materials"])}
         build_quantity = int(STATIC_BUILD_QUANTITIES.get(str(bp.get("name", "")), 1))
+        calculation_profile = load_build_calculation_profile(defaults)
         payload = {
             "blueprint": bp,
             "defaults": {
-                "tax_rate": defaults["tax_rate"],
-                "me": defaults["me"],
-                "te": defaults["te"],
+                "tax_rate": defaults.get("tax_rate"),
+                "me": defaults.get("me"),
+                "te": defaults.get("te"),
+                "build_calculation": defaults.get("build_calculation", {}),
             },
             "prices": relevant_prices,
             "build_quantity": build_quantity,
+            "system": calculation_profile.system,
+            "system_cost_index": calculation_profile.system_cost_index,
+            "facility_tax_percent": calculation_profile.facility_tax_percent,
+            "scc_surcharge_percent": calculation_profile.scc_surcharge_percent,
+            "additional_cost_isk": calculation_profile.additional_cost_isk,
+            "manufacturing_structure": calculation_profile.manufacturing_structure,
+            "manufacturing_rig": calculation_profile.manufacturing_rig,
+            "manufacturing_material_efficiency_bonus": calculation_profile.manufacturing_material_efficiency_bonus,
         }
         digest_input = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(digest_input.encode("utf-8")).hexdigest()
