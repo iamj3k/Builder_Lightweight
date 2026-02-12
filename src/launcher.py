@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from tkinter import END, Button, Label, StringVar, Tk
+from tkinter import Button, Label, StringVar, Tk
 from tkinter import filedialog, messagebox
 
 from auth import EveSsoClient
@@ -20,6 +20,7 @@ class LauncherApp:
         self.root = root
         self.root.title("Builder Lightweight Launcher")
         self.status = StringVar(value="Ready")
+        self.connection_state = StringVar(value="Reconnect")
 
         self.engine = CalculatorEngine(bundled_path("app_config.json"))
         esi_cfg = self.engine.config["esi"]
@@ -27,11 +28,13 @@ class LauncherApp:
             client_id=esi_cfg["client_id"],
             redirect_uri=esi_cfg["redirect_uri"],
             scopes=esi_cfg["scopes"],
+            token_store_path=Path.home() / ".builder_lightweight" / "sso_token.json",
         )
+        self.connection_state.set(self.sso.connection_label())
 
         Label(root, text="Builder Lightweight", font=("Segoe UI", 14, "bold")).pack(pady=(12, 8))
 
-        Button(root, text="Login (EVE SSO)", width=24, command=self.login).pack(pady=4)
+        Button(root, textvariable=self.connection_state, width=24, command=self.login).pack(pady=4)
         Button(root, text="Refresh data", width=24, command=self.refresh_data).pack(pady=4)
         Button(root, text="Export CSV", width=24, command=self.export_csv).pack(pady=4)
 
@@ -47,13 +50,23 @@ class LauncherApp:
         self.status.set("Logging in via EVE SSO...")
         self.root.update_idletasks()
         try:
-            result = self.sso.login()
-            self.status.set(f"Logged in. Token expires in {result.expires_in}s")
-        except Exception as exc:
-            self.status.set("Login failed")
-            messagebox.showerror("EVE SSO login failed", str(exc))
+            self.sso.login()
+            self.connection_state.set("Connected")
+            self.status.set("Connected")
+        except Exception:
+            self.connection_state.set("Reconnect")
+            self.status.set("Reconnect required")
+            messagebox.showerror("Sign-in failed", "Unable to connect. Please try reconnecting.")
 
     def refresh_data(self) -> None:
+        try:
+            self.sso.ensure_access_token()
+            self.connection_state.set("Connected")
+        except Exception:
+            self.connection_state.set("Reconnect")
+            self.status.set("Reconnect required")
+            return
+
         results = self.engine.refresh_data()
         total = sum(item.total_cost for item in results)
         self.status.set(f"Refreshed {len(results)} blueprints. Total: {total:,.2f} ISK")
