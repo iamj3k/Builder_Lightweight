@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .configuration import ensure_blueprint_whitelisted, get_me_te_for_blueprint
+
 
 @dataclass
 class BlueprintCost:
@@ -34,11 +36,15 @@ class CalculatorEngine:
         """Recalculate costs from the fixed bundled config."""
         defaults = self.config["defaults"]
         tax_rate = float(defaults["tax_rate"])
-        me_bonus = (100 - int(defaults["me"])) / 100
+        default_me = int(defaults["me"])
+        default_te = int(defaults["te"])
         prices = self.config.get("price_overrides", {})
 
         refreshed: list[BlueprintCost] = []
         for bp in self.config["blueprints"]:
+            ensure_blueprint_whitelisted(bp)
+            bp_me, _ = get_me_te_for_blueprint(bp["name"], default_me=default_me, default_te=default_te)
+            me_bonus = (100 - bp_me) / 100
             material_cost = 0.0
             for material, amount in bp["materials"].items():
                 unit_price = float(prices.get(material, 0))
