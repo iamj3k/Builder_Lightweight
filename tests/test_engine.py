@@ -5,7 +5,7 @@ import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.configuration import OUTPUT_MARKET_HUBS
+from src.configuration import MARKET_HUB_LOCATION_IDS, OUTPUT_MARKET_HUBS
 from src.engine import CSV_EXPORT_HEADERS, CalculatorEngine
 
 
@@ -81,3 +81,13 @@ def test_csv_export_header_schema_is_fixed() -> None:
         "c-n4od_order_price",
         "c-n4od_avg_daily_volume",
     ]
+
+
+def test_market_hub_location_ids_are_explicit_and_stable() -> None:
+    assert MARKET_HUB_LOCATION_IDS == {
+        "Jita": [60003760, 1022734985679],
+        "Amarr": [60008494],
+        "Dodixie": [60011866],
+        "O-PNSN": [1036927076065],
+        "C-N4OD": [1037131880317],
+    }

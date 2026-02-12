@@ -46,6 +46,22 @@ FACILITY_PROFILE: dict[str, Any] = {
 
 OUTPUT_MARKET_HUBS: list[str] = ["Jita", "Amarr", "Dodixie", "O-PNSN", "C-N4OD"]
 
+# ESI location-id mapping used to derive CSV hub columns:
+# - ESI market orders (volume_remain) in a hub's location IDs -> *_on_market
+# - ESI assets (quantity) in a hub's location IDs -> *_stock
+#
+# If a hub lists multiple location IDs, quantities are summed across every configured location.
+MARKET_HUB_LOCATION_IDS: dict[str, list[int]] = {
+    "Jita": [
+        60003760,      # Jita IV - Moon 4 - Caldari Navy Assembly Plant (NPC station)
+        1022734985679,  # Perimeter - Tranquility Trading Tower (player structure)
+    ],
+    "Amarr": [60008494],      # Amarr VIII (Oris) - Emperor Family Academy
+    "Dodixie": [60011866],    # Dodixie IX - Moon 20 - Federation Navy Assembly Plant
+    "O-PNSN": [1036927076065],
+    "C-N4OD": [1037131880317],
+}
+
 
 def ensure_blueprint_whitelisted(blueprint: dict[str, Any]) -> None:
     """Reject any blueprint not present in the local whitelist."""

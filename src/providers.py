@@ -47,6 +47,13 @@ class MarketSnapshotRecord:
 
 
 @dataclass(frozen=True)
+class HubStateRecord:
+    key: ItemKey
+    hub_name: str
+    on_market: int
+    stock: int
+
+@dataclass(frozen=True)
 class AggregatedRecord:
     key: ItemKey
     cost: CostRecord | None
@@ -126,6 +133,58 @@ class EsiCharacterStateAdapter(CharacterStateProvider):
                 open_order_quantity=orders_by_key.get(key, 0),
             )
         return normalized
+
+    def get_hub_state_records(self, hub_location_ids: Mapping[str, Iterable[int]]) -> dict[tuple[ItemKey, str], HubStateRecord]:
+        """Aggregate ESI orders/assets into hub-level *_on_market and *_stock values.
+
+        Rules:
+        - *_on_market uses ESI order ``volume_remain`` rows at any configured hub location id.
+        - *_stock uses ESI asset ``quantity`` rows at any configured hub location id.
+        - If a hub has multiple location ids, quantities are summed across all of them.
+        """
+        location_to_hubs: dict[int, set[str]] = {}
+        for hub_name, location_ids in hub_location_ids.items():
+            for location_id in location_ids:
+                normalized_location = int(location_id)
+                location_to_hubs.setdefault(normalized_location, set()).add(hub_name)
+
+        totals: dict[tuple[ItemKey, str], dict[str, int]] = {}
+
+        for row in self.asset_rows:
+            location_id = row.get("location_id")
+            if location_id in (None, ""):
+                continue
+            hubs = location_to_hubs.get(int(location_id), set())
+            if not hubs:
+                continue
+            key = ItemKey.from_raw(type_id=row.get("type_id"), item_name=row.get("item_name"))
+            quantity = int(row.get("quantity", 0))
+            for hub_name in hubs:
+                slot = totals.setdefault((key, hub_name), {"stock": 0, "on_market": 0})
+                slot["stock"] += quantity
+
+        for row in self.order_rows:
+            location_id = row.get("location_id")
+            if location_id in (None, ""):
+                continue
+            hubs = location_to_hubs.get(int(location_id), set())
+            if not hubs:
+                continue
+            key = ItemKey.from_raw(type_id=row.get("type_id"), item_name=row.get("item_name"))
+            volume_remain = int(row.get("volume_remain", 0))
+            for hub_name in hubs:
+                slot = totals.setdefault((key, hub_name), {"stock": 0, "on_market": 0})
+                slot["on_market"] += volume_remain
+
+        return {
+            pair: HubStateRecord(
+                key=pair[0],
+                hub_name=pair[1],
+                on_market=values["on_market"],
+                stock=values["stock"],
+            )
+            for pair, values in totals.items()
+        }
 
 
 class HubMarketSnapshotAdapter(MarketSnapshotProvider):

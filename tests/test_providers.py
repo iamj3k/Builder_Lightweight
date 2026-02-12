@@ -5,6 +5,7 @@ import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from src.configuration import MARKET_HUB_LOCATION_IDS
 from src.providers import (
     EveCookbookCostAdapter,
     EsiCharacterStateAdapter,
@@ -71,3 +72,31 @@ def test_aggregator_joins_by_normalized_key() -> None:
 def test_character_state_adapter_requires_oauth_token() -> None:
     with pytest.raises(ValueError, match="OAuth token"):
         EsiCharacterStateAdapter(oauth_token=" ", asset_rows=[], order_rows=[])
+
+
+def test_hub_state_records_map_orders_and_assets_by_location_id() -> None:
+    adapter = EsiCharacterStateAdapter(
+        oauth_token="token",
+        asset_rows=[
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 60003760, "quantity": 100},
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 1022734985679, "quantity": 25},
+            {"type_id": 35, "item_name": "Pyerite", "location_id": 60008494, "quantity": 20},
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 42, "quantity": 999},
+        ],
+        order_rows=[
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 60003760, "volume_remain": 40},
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 1022734985679, "volume_remain": 10},
+            {"type_id": 35, "item_name": "Pyerite", "location_id": 60008494, "volume_remain": 12},
+            {"type_id": 34, "item_name": "Tritanium", "location_id": 42, "volume_remain": 777},
+        ],
+    )
+
+    hub_state = adapter.get_hub_state_records(MARKET_HUB_LOCATION_IDS)
+
+    jita_key = (ItemKey(type_id=34, item_name="tritanium"), "Jita")
+    amarr_key = (ItemKey(type_id=35, item_name="pyerite"), "Amarr")
+
+    assert hub_state[jita_key].stock == 125
+    assert hub_state[jita_key].on_market == 50
+    assert hub_state[amarr_key].stock == 20
+    assert hub_state[amarr_key].on_market == 12
