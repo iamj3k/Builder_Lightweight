@@ -5,9 +5,12 @@ from pathlib import Path
 from tkinter import Button, Label, StringVar, Tk
 from tkinter import filedialog, messagebox
 
-from .auth import EveSsoClient
-from .engine import CalculatorEngine
-from .live_pricing import ConfigJitaLivePriceProvider
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from src.auth import EveSsoClient
+from src.engine import CalculatorEngine
+from src.live_pricing import ConfigJitaLivePriceProvider
 
 
 def bundled_path(file_name: str) -> Path:
