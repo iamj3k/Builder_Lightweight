@@ -12,6 +12,40 @@ from .cache import LocalSQLiteCache
 from .configuration import ensure_blueprint_whitelisted, get_me_te_for_blueprint
 
 
+CSV_EXPORT_HEADERS = [
+    "item_name",
+    "build_cost_per_unit",
+    "volume",
+    "top_market_group",
+    "quantity",
+    "jita_sell_price",
+    "jita_on_market",
+    "jita_stock",
+    "jita_order_price",
+    "jita_avg_daily_volume",
+    "amarr_sell_price",
+    "amarr_on_market",
+    "amarr_stock",
+    "amarr_order_price",
+    "amarr_avg_daily_volume",
+    "dodixie_sell_price",
+    "dodixie_on_market",
+    "dodixie_stock",
+    "dodixie_order_price",
+    "dodixie_avg_daily_volume",
+    "o-pnsn_sell_price",
+    "o-pnsn_on_market",
+    "o-pnsn_stock",
+    "o-pnsn_order_price",
+    "o-pnsn_avg_daily_volume",
+    "c-n4od_sell_price",
+    "c-n4od_on_market",
+    "c-n4od_stock",
+    "c-n4od_order_price",
+    "c-n4od_avg_daily_volume",
+]
+
+
 @dataclass
 class BlueprintCost:
     name: str
@@ -94,8 +128,40 @@ class CalculatorEngine:
 
         with target_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["blueprint", "material_cost", "tax_cost", "total_cost", "last_refresh_utc"])
-            timestamp = self.last_refresh.isoformat() if self.last_refresh else ""
+            writer.writerow(CSV_EXPORT_HEADERS)
             for row in self.results:
-                writer.writerow([row.name, row.material_cost, row.tax_cost, row.total_cost, timestamp])
+                writer.writerow(
+                    [
+                        row.name,
+                        row.total_cost,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                    ]
+                )
         return target_path
